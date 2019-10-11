@@ -30,10 +30,52 @@ final class SwiftQueuePerformanceTests: XCTestCase {
             XCTAssertEqual(queue.count, numItems)
         }
     }
+    
+    func testDeepCopyValueType() {
+        let original = SwiftQueue(0 ..< numItems)
+        
+        measure {
+            var copy = original
+            
+            copy.append(numItems)
+            
+            XCTAssertEqual(copy.count, numItems + 1)
+        }
+    }
+    
+    func testDeepCopyReferenceType() {
+        let original = SwiftQueue((0 ..< numItems).map({Dummy($0)}))
+        
+        measure {
+            var copy = original
+            
+            copy.append(Dummy(numItems))
+            
+            XCTAssertEqual(copy.count, numItems + 1)
+        }
+    }
+    
+    func testRemoveFirstValueType() {
+        
+        measureMetrics(SwiftQueuePerformanceTests.defaultPerformanceMetrics, automaticallyStartMeasuring: false) {
+            var original = SwiftQueue(0 ..< numItems)
+            startMeasuring()
+            for _ in 0 ..< numItems - 1 {
+                _ = original.removeFirst()
+            }
+            let actual = original.removeFirst()
+            stopMeasuring()
+            XCTAssertEqual(actual, numItems - 1)
+        }
+        
+    }
 
     static var allTests = [
     ("testCreateValueType", testCreateValueType),
     ("testCreateReferenceType", testCreateReferenceType),
+    ("testDeepCopyValueType", testDeepCopyValueType),
+    ("testDeepCopyReferenceType", testDeepCopyReferenceType),
+    ("testRemoveFirstValueType", testRemoveFirstValueType),
     ]
 }
 

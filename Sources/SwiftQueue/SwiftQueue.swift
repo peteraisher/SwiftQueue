@@ -1,23 +1,43 @@
-public struct SwiftQueue<T> {
+public struct SwiftQueue<Element>: Sequence, Collection, RangeReplaceableCollection {
     @usableFromInline
-    internal var storage: QueueStorage<T>
+    internal var storage: QueueStorage<Element>
 }
 
-extension SwiftQueue: Sequence {
+extension SwiftQueue {
+    @usableFromInline
+    mutating internal func copyStorage() {
+        storage = storage.copy()
+    }
+    
+    @usableFromInline
+    mutating internal func checkStorageUniqueAndCopyIfNecessary() {
+        if !isKnownUniquelyReferenced(&storage) {
+            copyStorage()
+        }
+    }
+}
+
+// MARK: - Sequence
+
+// MARK: Iterating
+
+extension SwiftQueue {
+
+    @usableFromInline
+    typealias Box = QueueStorage<Element>.Box
     
     public struct Iterator: IteratorProtocol {
-        public typealias Element = T
         
         @usableFromInline
-        internal var nextBox: QueueStorage<T>.Box? = nil
+        internal var nextBox: Box? = nil
         
         @inlinable
-        internal init(_ start: QueueStorage<T>.Box?) {
+        internal init(_ start: Box?) {
             self.nextBox = start
         }
         
         @inlinable
-        mutating public func next() -> T? {
+        mutating public func next() -> Element? {
             defer { nextBox = nextBox?.next }
             return nextBox?.element
         }
@@ -25,149 +45,154 @@ extension SwiftQueue: Sequence {
     }
     
     @inlinable
-    public func makeIterator() -> SwiftQueue<T>.Iterator {
+    public func makeIterator() -> Iterator {
         return Iterator(storage.start)
     }
 }
 
-extension SwiftQueue: Collection {
-    
-    public typealias Element = T
+// MARK: - Collection
 
-    @usableFromInline
-    typealias Box = QueueStorage<T>.Box
-    
-    public struct Index: Comparable {
-        
-        @inlinable
-        public static func == (lhs: SwiftQueue<T>.Index, rhs: SwiftQueue<T>.Index) -> Bool {
-            return lhs.index == rhs.index
-        }
-        
-        @inlinable
-        public static func < (lhs: SwiftQueue<T>.Index, rhs: SwiftQueue<T>.Index) -> Bool {
-            return lhs.index < rhs.index
-        }
-        
-        @usableFromInline
-        internal let index: Int
-        
-        @usableFromInline
-        internal let box: Unmanaged<Box>?
-        
-        @inlinable
-        init(_ box: Box?, count: Int) {
-            index = count
-            guard let b = box else {
-                self.box = nil
-                return
-            }
-            self.box = Unmanaged<Box>.passUnretained(b)
-        }
-    }
-    
-    @inlinable
-    public var count: Int { return storage.totalBoxCount - storage.startBoxCount }
-    
-    @inlinable
-    public var startIndex: SwiftQueue<T>.Index {
-        return Index(storage.start, count: storage.startBoxCount)
-    }
-    
-    @inlinable
-    public var endIndex: SwiftQueue<T>.Index {
-        return Index(storage.end, count: storage.totalBoxCount)
-    }
-    
-    @inlinable
-    internal func checkIndex(_ index: Index) -> Unmanaged<Box> {
-        guard index.index >= storage.startBoxCount && index.index < storage.totalBoxCount else {
-            fatalError("Index out of range")
-        }
-        guard let box = index.box else {
-            fatalError("Invalid index")
-        }
-        return box
-    }
-    
-    @inlinable
-    public subscript(position: SwiftQueue<T>.Index) -> T {
-        get {
-            return checkIndex(position).takeUnretainedValue().element
-        }
-        mutating set {
-            checkIndex(position).takeUnretainedValue().element = newValue
-        }
-    }
-    
-    @inlinable
-    public func index(after i: SwiftQueue<T>.Index) -> SwiftQueue<T>.Index {
-        return storage.index(after: i)
-    }
+// MARK: Associated Types
+
+extension SwiftQueue {
+    public typealias Index = Int
+    public typealias SubSequence = SwiftQueue
 }
 
-extension SwiftQueue: RangeReplaceableCollection {
+// MARK: Accessing Elements
+
+extension SwiftQueue {
     
-    public init() {
-        self.storage = QueueStorage<T>()
-    }
-    
-    public typealias SubSequence = SwiftQueue
-    
-    @usableFromInline
-    mutating internal func copyStorage() {
-        storage = storage.copy()
-    }
-    
-    @usableFromInline
-    mutating func checkUniqueAndCopyIfNecessary() {
-        if !isKnownUniquelyReferenced(&storage) {
-            copyStorage()
+    @inlinable
+    public subscript(position: Int) -> Element {
+        get {
+            storage.checkIndex(position)
+            return storage.getElementAtUncheckedIndex(position)
+        }
+        mutating set {
+            storage.checkIndex(position)
+            storage.setElementAtUncheckedIndex(position, to: newValue)
         }
     }
+}
+// MARK: Selecting and excluding elements
+extension SwiftQueue {
     
-    mutating public func append(_ newElement: __owned T) {
-        checkUniqueAndCopyIfNecessary()
-        storage.append(newElement)
+    @inlinable
+    mutating public func popFirst() -> Element? {
+        checkStorageUniqueAndCopyIfNecessary()
+        return storage.popFirst()
     }
     
     @inlinable
-    mutating public func removeFirst() -> T {
-        checkUniqueAndCopyIfNecessary()
+    mutating public func removeFirst() -> Element {
+        checkStorageUniqueAndCopyIfNecessary()
         return storage.removeFirst()
     }
     
     @inlinable
-    mutating public func insert(_ newElement: __owned T, at i: SwiftQueue<T>.Index) {
-        checkUniqueAndCopyIfNecessary()
-        storage.insert(newElement, at: i)
+    mutating public func removeFirst(_ k: Int) {
+        guard k > 0 else { return }
+        checkStorageUniqueAndCopyIfNecessary()
+        storage.removeFirst(k)
+    }
+
+// MARK: Manipulating indices
+
+    
+    @inlinable
+    public var startIndex: Index { return 0 }
+    
+    @inlinable
+    public var endIndex: Index {
+        return count
+    }
+    
+//    public var indices: Range<Index> { return startIndex ..< endIndex}
+    
+    @inlinable
+    public func index(after i: Index) -> Index {
+        return storage.index(after: i)
     }
     
     @inlinable
-    mutating public func insert<C>(contentsOf newElements: __owned C, at i: SwiftQueue<T>.Index) where C : Collection, SwiftQueue<T>.Element == C.Element {
-        guard newElements.count > 0 else { return }
-        checkUniqueAndCopyIfNecessary()
-        storage.insert(contentsOf: newElements, at: i)
+    public func formIndex(after i: inout Index) {
+        i += 1
+    }
+}
+
+// MARK: Instance Properties
+
+extension SwiftQueue {
+    
+    @inlinable
+    public var count: Int { return storage.count }
+    
+    @inlinable
+    public var first: Element? { return storage.first }
+    
+    @inlinable
+    public var isEmpty: Bool { return storage.start == nil }
+    
+}
+
+// MARK: - RangeReplaceableCollection
+
+// MARK: Initializers
+
+extension SwiftQueue {
+    
+    public init() {
+        self.storage = QueueStorage<Element>()
     }
     
     @inlinable
-    public init<S>(_ elements: S) where S : Sequence, SwiftQueue.Element == S.Element {
+    public init<S>(_ elements: S) where S : Sequence, Element == S.Element {
         self.storage = QueueStorage(elements)
     }
     
     @inlinable
-    public init(repeating repeatedValue: Self.Element, count: Int) {
+    public init(repeating repeatedValue: Element, count: Int) {
         self.storage = QueueStorage(repeating: repeatedValue, count: count)
     }
     
-    @inlinable
-    public var first: T? { return storage.first }
 }
 
-extension SwiftQueue: ExpressibleByArrayLiteral {
-    public typealias ArrayLiteralElement = T
+// MARK: Instance methods
+
+extension SwiftQueue {
     
-    public init(arrayLiteral elements: T...) {
+    mutating public func append(_ newElement: __owned Element) {
+        checkStorageUniqueAndCopyIfNecessary()
+        storage.append(newElement)
+    }
+    
+    @inlinable
+    mutating public func insert(_ newElement: __owned Element, at i: Index) {
+        checkStorageUniqueAndCopyIfNecessary()
+        storage.insert(newElement, at: i)
+    }
+    
+    @inlinable
+    mutating public func insert<C>(contentsOf newElements: __owned C, at i: Index) where C : Collection, Element == C.Element {
+        guard newElements.count > 0 else { return }
+        checkStorageUniqueAndCopyIfNecessary()
+        storage.insert(contentsOf: newElements, at: i)
+    }
+    
+    @inlinable
+    mutating public func removeAll(keepingCapacity keepCapacity: Bool = false) {
+        storage = QueueStorage()
+    }
+}
+
+
+// MARK: - ExpressibleByArrayLiteral
+
+extension SwiftQueue: ExpressibleByArrayLiteral {
+    public typealias ArrayLiteralElement = Element
+    
+    public init(arrayLiteral elements: Element...) {
         self.init(elements)
     }
 }

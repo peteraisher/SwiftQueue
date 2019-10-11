@@ -180,6 +180,38 @@ final class SwiftQueueTests: XCTestCase {
         for pair in zip(queue, array) {
             XCTAssertEqual(pair.0, pair.1)
         }
+        
+        queue.insert(contentsOf: [], at: thirdIndex)
+        array.insert(contentsOf: [], at: arrayThirdIndex)
+        
+        XCTAssertEqual(queue.count, array.count)
+        
+        for pair in zip(queue, array) {
+            XCTAssertEqual(pair.0, pair.1)
+        }
+    }
+    
+    func testRemoveFirstK() {
+        var queue = SwiftQueue(0 ..< 100)
+        queue.removeFirst(20)
+        XCTAssertEqual(queue.count, 80)
+        let removed = queue.removeFirst()
+        XCTAssertEqual(removed, 20)
+    }
+    
+    func testValueSemantics() {
+        var a = SwiftQueue(1 ... 5)
+        var b = a
+        _ = a.removeFirst()
+        b.append(20)
+        
+        let arrayA = Array(a)
+        let arrayB = Array(b)
+        
+        XCTAssertNotEqual(arrayA, arrayB)
+        
+        XCTAssertEqual(arrayA, [2, 3, 4, 5])
+        XCTAssertEqual(arrayB, [1, 2, 3, 4, 5, 20])
     }
 
     static var allTests = [
@@ -197,5 +229,7 @@ final class SwiftQueueTests: XCTestCase {
     ("testSubscript", testSubscript),
     ("testInsert", testInsert),
     ("testInsertContentsOf", testInsertContentsOf),
+    ("testValueSemantics", testValueSemantics),
+    ("testRemoveFirstK", testRemoveFirstK),
     ]
 }
