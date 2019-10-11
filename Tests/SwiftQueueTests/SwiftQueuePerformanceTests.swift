@@ -67,7 +67,20 @@ final class SwiftQueuePerformanceTests: XCTestCase {
             stopMeasuring()
             XCTAssertEqual(actual, numItems - 1)
         }
-        
+    }
+    
+    func testAlternatingAppendAndRemove() {
+        var queue = SwiftQueue<Int>()
+        measure {
+            for i in 0 ..< numItems {
+                if i % 3 == 2 { _ = queue.removeFirst() }
+                else { queue.append(i) }
+            }
+            for i in 0 ..< numItems {
+                if i % 3 == 0 { queue.append(i) }
+                else { _ = queue.removeFirst() }
+            }
+        }
     }
 
     static var allTests = [
@@ -76,6 +89,7 @@ final class SwiftQueuePerformanceTests: XCTestCase {
     ("testDeepCopyValueType", testDeepCopyValueType),
     ("testDeepCopyReferenceType", testDeepCopyReferenceType),
     ("testRemoveFirstValueType", testRemoveFirstValueType),
+    ("testAlternatingAppendAndRemove", testAlternatingAppendAndRemove),
     ]
 }
 
