@@ -24,6 +24,7 @@ final class SwiftQueueTests: XCTestCase {
         let queue = SwiftQueue<Int>()
         
         XCTAssertEqual(queue.count, 0)
+        XCTAssert(queue.isEmpty)
     }
     
     
@@ -48,11 +49,19 @@ final class SwiftQueueTests: XCTestCase {
             XCTFail("queue.first was unexpectedly nil")
             return
         }
+        guard let last = queue.last else {
+            XCTFail("queue.last was unexpectedly nil")
+            return
+        }
         XCTAssertEqual(first, 4)
+        XCTAssertEqual(last, 4)
         
         let removed = queue.removeFirst()
         XCTAssertEqual(removed, 4)
         XCTAssertEqual(queue.count, 0)
+        XCTAssert(queue.isEmpty)
+        XCTAssertNil(queue.first)
+        XCTAssertNil(queue.last)
     }
     
     func testAppendAndRemoveReferenceType() {
@@ -64,11 +73,19 @@ final class SwiftQueueTests: XCTestCase {
             XCTFail("queue.first was unexpectedly nil")
             return
         }
+        guard let last = queue.last else {
+            XCTFail("queue.last was unexpectedly nil")
+            return
+        }
         XCTAssertEqual(first, Dummy(4))
+        XCTAssertEqual(last, Dummy(4))
         
         let removed = queue.removeFirst()
         XCTAssertEqual(removed, Dummy(4))
         XCTAssertEqual(queue.count, 0)
+        XCTAssert(queue.isEmpty)
+        XCTAssertNil(queue.first)
+        XCTAssertNil(queue.last)
     }
     
     func testInitContentsOfValueType() {
@@ -131,8 +148,18 @@ final class SwiftQueueTests: XCTestCase {
         let startIndex = queue.startIndex
         let secondIndex = queue.index(after: startIndex)
         XCTAssertEqual(secondIndex, queue.endIndex)
-        let thirdIndex = queue.index(after: secondIndex)
-        XCTAssertLessThan(secondIndex, thirdIndex)
+        XCTAssertLessThan(startIndex, secondIndex)
+    }
+    
+    func testFormIndexAfter() {
+        let queue = SwiftQueue([1, 2])
+        var firstIndex = queue.startIndex
+        let secondIndex = queue.index(after: firstIndex)
+        XCTAssertEqual(queue[firstIndex], 1)
+        queue.formIndex(after: &firstIndex)
+        XCTAssertEqual(secondIndex, firstIndex)
+        XCTAssertEqual(queue[secondIndex], 2)
+        XCTAssertEqual(queue[firstIndex], 2)
     }
     
     func testSubscript() {
@@ -199,6 +226,27 @@ final class SwiftQueueTests: XCTestCase {
         XCTAssertEqual(removed, 20)
     }
     
+    func testRemoveAll() {
+        var queue = SwiftQueue(0 ..< 100)
+        queue.removeAll()
+        XCTAssertEqual(queue.count, 0)
+        XCTAssert(queue.isEmpty)
+    }
+    
+    func testPopFirst() {
+        var queue = SwiftQueue(0 ..< 10)
+        for i in 0 ..< 10 {
+            guard let j = queue.popFirst() else {
+                XCTFail("popFirst() unexpectedly returned nil")
+                return
+            }
+            XCTAssertEqual(i, j)
+        }
+        XCTAssert(queue.isEmpty)
+        XCTAssertEqual(queue.count, 0)
+        XCTAssertNil(queue.popFirst())
+    }
+    
     func testValueSemantics() {
         var a = SwiftQueue(1 ... 5)
         var b = a
@@ -226,10 +274,13 @@ final class SwiftQueueTests: XCTestCase {
     ("testIndexComparison", testIndexComparison),
     ("testEmptyIndex", testEmptyIndex),
     ("testIndexAfter", testIndexAfter),
+    ("testFormIndexAfter", testFormIndexAfter),
     ("testSubscript", testSubscript),
     ("testInsert", testInsert),
     ("testInsertContentsOf", testInsertContentsOf),
-    ("testValueSemantics", testValueSemantics),
     ("testRemoveFirstK", testRemoveFirstK),
+    ("testRemoveAll", testRemoveAll),
+    ("testPopFirst", testPopFirst),
+    ("testValueSemantics", testValueSemantics),
     ]
 }

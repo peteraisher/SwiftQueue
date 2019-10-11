@@ -55,7 +55,31 @@ extension SwiftQueue {
 // MARK: Associated Types
 
 extension SwiftQueue {
-    public typealias Index = Int
+//    public typealias Index = Int
+    public struct Index: Comparable {
+        @inlinable
+        public static func < (lhs: SwiftQueue<Element>.Index, rhs: SwiftQueue<Element>.Index) -> Bool {
+            return lhs.offset < rhs.offset
+        }
+        
+        @inlinable
+        public static func == (lhs: SwiftQueue<Element>.Index, rhs: SwiftQueue<Element>.Index) -> Bool {
+            return lhs.offset == rhs.offset
+        }
+        
+        @usableFromInline
+        internal var offset: Int
+        
+        @usableFromInline
+        internal var box: Unmanaged<Box>?
+        
+        @inlinable
+        init(_ box: Box?, offset: Int) {
+            self.offset = offset
+            self.box = box.map{Unmanaged.passUnretained($0)}
+        }
+    }
+    
     public typealias SubSequence = SwiftQueue
 }
 
@@ -64,7 +88,7 @@ extension SwiftQueue {
 extension SwiftQueue {
     
     @inlinable
-    public subscript(position: Int) -> Element {
+    public subscript(position: Index) -> Element {
         get {
             storage.checkIndex(position)
             return storage.getElementAtUncheckedIndex(position)
@@ -101,14 +125,10 @@ extension SwiftQueue {
 
     
     @inlinable
-    public var startIndex: Index { return 0 }
+    public var startIndex: Index { Index(storage.start, offset: 0) }
     
     @inlinable
-    public var endIndex: Index {
-        return count
-    }
-    
-//    public var indices: Range<Index> { return startIndex ..< endIndex}
+    public var endIndex: Index { Index(storage.end, offset: count) }
     
     @inlinable
     public func index(after i: Index) -> Index {
@@ -117,7 +137,7 @@ extension SwiftQueue {
     
     @inlinable
     public func formIndex(after i: inout Index) {
-        i += 1
+        storage.formIndex(after: &i)
     }
 }
 
@@ -195,4 +215,11 @@ extension SwiftQueue: ExpressibleByArrayLiteral {
     public init(arrayLiteral elements: Element...) {
         self.init(elements)
     }
+}
+
+// MARK: - Extra methods
+
+extension SwiftQueue {
+    @inlinable
+    public var last: Element? { return storage.last }
 }

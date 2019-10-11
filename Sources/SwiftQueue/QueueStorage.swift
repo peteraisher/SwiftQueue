@@ -32,38 +32,48 @@ internal final class QueueStorage<T> {
 }
 
 extension QueueStorage {
+    @usableFromInline
+    typealias Index = SwiftQueue<T>.Index
     
     @inlinable
-    internal func checkIndex(_ index: Int) {
-        guard index >= 0 && index < count else {
+    internal func checkIndex(_ index: Index) {
+        guard index.offset >= 0 && index.offset < count else {
             fatalError("Index out of range")
         }
-    }
-    
-    @inlinable
-    internal func getBoxForUncheckedIndex(_ index: Int) -> Box {
-        var currentBox = start!
-        for _ in 0 ..< index {
-            currentBox = currentBox.next!
+        guard index.box != nil else {
+            fatalError("Index is invalid")
         }
-        return currentBox
     }
     
     @inlinable
-    internal func getElementAtUncheckedIndex(_ index: Int) -> T {
+    internal func getBoxForUncheckedIndex(_ index: Index) -> Box {
+        return index.box!.takeUnretainedValue()
+    }
+    
+    @inlinable
+    internal func getElementAtUncheckedIndex(_ index: Index) -> T {
         let box = getBoxForUncheckedIndex(index)
         return box.element
     }
     
     @inlinable
-    internal func setElementAtUncheckedIndex(_ index: Int, to newValue: T) {
+    internal func setElementAtUncheckedIndex(_ index: Index, to newValue: T) {
         let box = getBoxForUncheckedIndex(index)
         box.element = newValue
     }
     
     @inlinable
-    func index(after i: Int) -> Int {
-        return i + 1
+    func index(after i: Index) -> Index {
+        checkIndex(i)
+        let box = getBoxForUncheckedIndex(i)
+        return Index(box.next, offset: i.offset + 1)
+    }
+    
+    @inlinable
+    func formIndex(after i: inout Index) {
+        checkIndex(i)
+        i.box = i.box?.takeUnretainedValue().next.map{Unmanaged.passUnretained($0)}
+        i.offset += 1
     }
 }
 
@@ -227,4 +237,9 @@ extension QueueStorage {
     internal func copy() -> QueueStorage {
         return QueueStorage(copying: self)
     }
+}
+
+extension QueueStorage {
+    @inlinable
+    internal var last: T? { return end?.element }
 }
