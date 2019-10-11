@@ -10,11 +10,16 @@ internal final class QueueStorage<T> {
         @usableFromInline
         var element: T
         
-        @usableFromInline
+        @inlinable
         init?(_ element: T?) {
             guard let theElement = element else { return nil }
             
             self.element = theElement
+        }
+        
+        @inlinable
+        init(_ element: T) {
+            self.element = element
         }
     }
     
@@ -72,7 +77,7 @@ extension QueueStorage {
     @inlinable
     func formIndex(after i: inout Index) {
         checkIndex(i)
-        i.box = i.box?.takeUnretainedValue().next.map{Unmanaged.passUnretained($0)}
+        i.box = getBoxForUncheckedIndex(i).next.map{Unmanaged.passUnretained($0)}
         i.offset += 1
     }
 }
@@ -86,13 +91,11 @@ extension QueueStorage {
         
         let newBox = Box(newElement)
         
-        guard let oldEnd = end else {
+        if start == nil {
             start = newBox
-            end = newBox
-            return
+        } else {
+            end!.next = newBox
         }
-        
-        oldEnd.next = newBox
         end = newBox
     }
     
@@ -143,7 +146,7 @@ extension QueueStorage {
         let currentBox = getBoxForUncheckedIndex(i)
             
         
-        let movedBox = Box(currentBox.element)!
+        let movedBox = Box(currentBox.element)
         
         movedBox.next = currentBox.next
         currentBox.next = movedBox
@@ -175,7 +178,7 @@ extension QueueStorage {
         
         let currentBox = getBoxForUncheckedIndex(i)
         
-        let movedBox = Box(currentBox.element)!
+        let movedBox = Box(currentBox.element)
         
         movedBox.next = currentBox.next
         
@@ -195,17 +198,35 @@ extension QueueStorage {
     @inlinable
     convenience init<S>(_ elements: S) where S : Sequence, T == S.Element {
         self.init()
-        for element in elements {
-            self.append(element)
+        var iterator = elements.makeIterator()
+        guard let firstElement = iterator.next() else {
+            return
         }
+        var currentBox = Box(firstElement)
+        start = currentBox
+        self.count = 1
+        while let element = iterator.next() {
+            let nextBox = Box(element)
+            currentBox.next = nextBox
+            currentBox = nextBox
+            self.count += 1
+        }
+        end = currentBox
     }
     
     @inlinable
     convenience init(repeating repeatedValue: T, count: Int) {
         self.init()
-        for _ in 0 ..< count {
-            self.append(repeatedValue)
+        guard count > 0 else { return }
+        var currentBox = Box(repeatedValue)
+        start = currentBox
+        for _ in 1 ..< count {
+            let nextBox = Box(repeatedValue)
+            currentBox.next = nextBox
+            currentBox = nextBox
         }
+        end = currentBox
+        self.count = count
     }
     
     @inlinable
@@ -225,7 +246,7 @@ extension QueueStorage {
         var thisBox = self.start!
         var otherBox = other.start
         while let nextOtherBox = otherBox?.next {
-            let nextBox = Box(nextOtherBox.element)!
+            let nextBox = Box(nextOtherBox.element)
             thisBox.next = nextBox
             thisBox = nextBox
             otherBox = nextOtherBox

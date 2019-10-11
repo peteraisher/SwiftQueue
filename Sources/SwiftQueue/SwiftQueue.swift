@@ -162,6 +162,7 @@ extension SwiftQueue {
 
 extension SwiftQueue {
     
+    @inlinable
     public init() {
         self.storage = QueueStorage<Element>()
     }
@@ -182,6 +183,7 @@ extension SwiftQueue {
 
 extension SwiftQueue {
     
+    @inlinable
     mutating public func append(_ newElement: __owned Element) {
         checkStorageUniqueAndCopyIfNecessary()
         storage.append(newElement)
@@ -212,6 +214,7 @@ extension SwiftQueue {
 extension SwiftQueue: ExpressibleByArrayLiteral {
     public typealias ArrayLiteralElement = Element
     
+    @inlinable
     public init(arrayLiteral elements: Element...) {
         self.init(elements)
     }

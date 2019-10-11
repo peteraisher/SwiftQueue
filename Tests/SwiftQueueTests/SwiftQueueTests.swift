@@ -38,6 +38,14 @@ final class SwiftQueueTests: XCTestCase {
         XCTAssertEqual(queue.removeFirst(), 2)
         XCTAssertEqual(queue.removeFirst(), 3)
         XCTAssertEqual(queue.removeFirst(), 4)
+        
+        queue.append(5)
+        queue.append(6)
+        XCTAssertEqual(queue.removeFirst(), 5)
+        queue.append(7)
+        XCTAssertEqual(queue.removeFirst(), 6)
+        XCTAssertEqual(queue.removeFirst(), 7)
+        
     }
     
     func testAppendAndRemoveValueType() {
