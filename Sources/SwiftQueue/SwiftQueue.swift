@@ -10,7 +10,7 @@ import Foundation
 /// on a possibly-empty queue.
 ///
 /// Subscript access allows access to the elements of the queue in the order that they were added.
-public struct SwiftQueue<Element>: Sequence, Collection, RangeReplaceableCollection {
+public struct SwiftQueue<Element>: Sequence, Collection, RangeReplaceableCollection, RandomAccessCollection, MutableCollection {
     
     @usableFromInline
     internal typealias _Backing = _Buffer<Element>
@@ -29,7 +29,7 @@ public struct SwiftQueue<Element>: Sequence, Collection, RangeReplaceableCollect
 extension SwiftQueue {
     
     
-    /// Provides iterated sequential access to the elements of the queue
+    /// Provides iterated sequential access to the elements of the queue.
     ///
     /// Wraps an iterator to the underlying buffer.
     public struct Iterator: IteratorProtocol {
@@ -66,7 +66,7 @@ extension SwiftQueue {
 
 extension SwiftQueue {
     
-    /// Check if an index is valid
+    /// Checks if an index is valid.
     @inlinable
     internal func _checkIndex(_ index: Int) {
         assert(index >= 0 && index < count)
@@ -90,9 +90,10 @@ extension SwiftQueue {
 // MARK: Selecting and excluding elements
 extension SwiftQueue {
     
-    /// Removes and returns the first element of the collection.
+    /// Removes and returns the first element of the queue.
     ///
-    /// - Returns: The first element of the collection if the collection is not empty; otherwise, nil.
+    /// - Returns: The first element of the queue if the queue is not empty; otherwise, nil.
+    /// - Complexity: O(*1*)
     @inlinable
     @discardableResult
     mutating public func popFirst() -> Element? {
@@ -100,9 +101,9 @@ extension SwiftQueue {
         return removeFirst()
     }
     
-    /// Ensure the buffer backing this queue is unique.
+    /// Ensures the buffer backing this queue is unique.
     ///
-    /// If the buffer was not unique, it is copied to a new buffer with the same capacity
+    /// If the buffer is not unique, it is copied to a new buffer with the same capacity
     /// with its elements in logical order, i.e. the first element at buffer index 0.
     @inlinable
     mutating func _makeUniqueAndLogicallyReorderIfNotUnique() {
@@ -110,7 +111,7 @@ extension SwiftQueue {
         _buffer._outlinedMakeUniqueBuffer(bufferCount: theCount)
     }
     
-    /// Remove and return the first element of the queue without checking for uniqueness.
+    /// Removes and returns the first element of the queue without checking for uniqueness.
     ///
     /// - Returns: The first element of the queue.
     @inlinable
@@ -123,12 +124,25 @@ extension SwiftQueue {
         return result
     }
     
+    /// Removes and returns the first element of the queue.
+    ///
+    /// The queue must not be empty.
+    ///
+    /// Calling this method invalidates any existing indices for use with this queue.
+    /// - Complexity: O(*1*).
     @inlinable
     mutating public func removeFirst() -> Element {
         _makeUniqueAndLogicallyReorderIfNotUnique()
         return _removeFirstAssumingUnique()
     }
     
+    /// Removes the specified number of elements from the beginning of the queue.
+    ///
+    /// Calling this method invalidates any existing indices for use with this queue.
+    /// - Parameter k: The number of elements to remove from the collection.
+    ///     `k` must be greater than or equal to zero and must not exceed the
+    ///     number of elements in the collection.
+    /// - Complexity: O(*k*).
     @inlinable
     mutating public func removeFirst(_ k: Int) {
         guard k > 0 else { return }
@@ -274,12 +288,18 @@ extension SwiftQueue {
     
     @inlinable
     mutating public func insert(_ newElement: __owned Element, at i: Index) {
-        _buffer._reorderingOutOfPlaceReplace(circularRange: i ..< i, with: CollectionOfOne(newElement), count: 1)
+        if _slowPath(i == endIndex) {
+            append(newElement)
+        } else {
+            // TODO: check first if we have the capacity to do a more efficient insert
+            _buffer._reorderingOutOfPlaceReplace(circularRange: i ..< i, with: CollectionOfOne(newElement), count: 1)
+        }
     }
     
     @inlinable
     mutating public func insert<C>(contentsOf newElements: __owned C, at i: Index) where C : Collection, Element == C.Element {
         guard newElements.count > 0 else { return }
+        // TODO: check first if we have the capacity to do a more efficient insert
         _buffer._reorderingOutOfPlaceReplace(circularRange: i ..< i, with: newElements, count: newElements.count)
     }
     
