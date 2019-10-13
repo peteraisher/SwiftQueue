@@ -46,8 +46,9 @@ Elements can be added, removed and accessed using standard methods and propertie
 
     var queue: SwiftQueue = ["I", "love", "to", "queue"]
     
-    queue.append("!")
+    queue.append("!")           // queue is now ["I", "love", "to", "queue", "!"]
     print(queue.removeFirst())  // prints "I"
+                                // queue is now ["love", "to", "queue", "!"]
     
     print(queue.first!)         // prints "love"
     
