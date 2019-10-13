@@ -421,29 +421,6 @@ extension _Buffer: Sequence {
 }
 
 extension _Buffer {
-    @inlinable
-    init(copying other: __owned _Buffer) {
-        // TODO: a more efficient implementation by copying memory directly in chunks then discarding the other
-        self = _copySequenceToContiguousBuffer(other)
-    }
-    
-    @inlinable
-    init(capacity minimumCapacity: Int, copying other: __owned _Buffer) {
-        
-        let otherCount = other.count
-        self = _Buffer<Element>(_uninitializedCount: otherCount, minimumCapacity: minimumCapacity)
-        if other.tailIndexIsWrapped {
-            let headToEnd = other.capacity - other.headIndex
-            firstElementAddress.moveInitialize(from: other.firstElementAddress + other.headIndex, count: headToEnd)
-            (firstElementAddress + headToEnd).moveInitialize(from: other.firstElementAddress, count: tailIndex)
-            other.headIndex = 0
-            other.tailIndex = 0
-            other.tailIndexIsWrapped = false
-        } else {
-            firstElementAddress.moveInitialize(from: other.firstElementAddress + other.headIndex, count: otherCount)
-        }
-        tailIndex = otherCount
-    }
     
     @inline(never)
     @inlinable // @specializable
@@ -471,56 +448,7 @@ extension _Buffer {
         
         var newBuffer = _forceCreateUniqueMutableBuffer(
             newCount: bufferCount, requiredCapacity: bufferCount)
-        _fullBufferOutOfPlaceUpdate(&newBuffer, bufferCount, 0)
-    }
-
-
-    /// Copy the elements in `bounds` from this buffer into uninitialized
-    /// memory starting at `target`.  Return a pointer "past the end" of the
-    /// just-initialized memory.
-    @inlinable
-    @discardableResult
-    internal __consuming func _copyContents(
-        subRange bounds: Range<Int>,
-        initializing target: UnsafeMutablePointer<Element>
-    ) -> UnsafeMutablePointer<Element> {
-        assert(bounds.lowerBound >= 0)
-        assert(bounds.upperBound >= bounds.lowerBound)
-        assert(bounds.upperBound <= count)
-
-        let initializedCount = bounds.upperBound - bounds.lowerBound
-        target.initialize(
-            from: firstElementAddress + bounds.lowerBound, count: initializedCount)
-        _fixLifetime(owner)
-        return target + initializedCount
-    }
-    
-    @inlinable
-    internal func _createLogicallyOrderedCopy() -> _Buffer<Element> {
-        let newCount = self.count
-        var newBuffer = _forceCreateUniqueMutableBuffer(newCount: newCount, requiredCapacity: newCount)
-        _logicallyOrderOtherBuffer(&newBuffer)
-        return newBuffer
-    }
-    
-    @inlinable
-    internal func _logicallyOrderOtherBuffer(_ dest: inout _Buffer<Element>) {
-        assert(dest.capacity >= self.count)
-        assert(dest.headIndex == 0)
-        
-        let base = firstElementAddress
-        let headPointer = base + headIndex
-        
-        let destBase = dest.firstElementAddress
-        
-        if tailIndexIsWrapped {
-            let headToEnd = capacity - headIndex
-            destBase.initialize(from: headPointer, count: headToEnd)
-            (destBase + headToEnd).initialize(from: base, count: tailIndex)
-        } else {
-            destBase.initialize(from: headPointer, count: self.count)
-        }
-        dest.tailIndex = self.count
+        _reorderingOutOfPlaceUpdate(dest: &newBuffer, headCount: bufferCount, newCount: 0)
     }
     
     @inlinable
@@ -639,74 +567,6 @@ extension _Buffer {
                 newEnd.initialize(from: oldStart + oldCount, count: tailCount)
             }
             _fixLifetime(owner)
-        }
-        self = dest
-    }
-    
-    /// Initialize the elements of dest by copying the first headCount
-    /// items from source, calling initializeNewElements on the next
-    /// uninitialized element, and finally by copying the last N items
-    /// from source into the N remaining uninitialized elements of dest.
-    ///
-    /// As an optimization, may move elements out of source rather than
-    /// copying when it isUniquelyReferenced.
-    @inline(never)
-    @inlinable // @specializable
-    internal mutating func _fullBufferOutOfPlaceUpdate(
-        _ dest: inout _Buffer<Element>,
-        _ headCount: Int, // Count of initial source elements to copy/move
-        _ newCount: Int,  // Number of new elements to insert
-        _ initializeNewElements:
-            ((UnsafeMutablePointer<Element>, _ count: Int) -> ()) = { ptr, count in
-                assert(count == 0)
-        }
-    ) {
-
-        assert(headCount >= 0)
-        assert(newCount >= 0)
-        
-        // Count of trailing source elements to copy/move
-        let sourceCount = self.count
-        let tailCount = dest.count - headCount - newCount
-        assert(headCount + tailCount <= sourceCount)
-        
-        let oldCount = sourceCount - headCount - tailCount
-        let destStart = dest.firstElementAddress
-        let newStart = destStart + headCount
-        let newEnd = newStart + newCount
-        
-        // Check to see if we have storage we can move from
-        if let backing = requestUniqueMutableBackingBuffer(
-            minimumCapacity: sourceCount) {
-            
-            let sourceStart = firstElementAddress
-            let oldStart = sourceStart + headCount
-            
-            // Move the head items
-            destStart.moveInitialize(from: sourceStart, count: headCount)
-            
-            // Destroy unused source items
-            oldStart.deinitialize(count: oldCount)
-            
-            initializeNewElements(newStart, newCount)
-            
-            // Move the tail items
-            newEnd.moveInitialize(from: oldStart + oldCount, count: tailCount)
-            
-            backing.headIndex = 0
-            backing.tailIndex = 0
-            backing.tailIndexIsWrapped = false
-        }
-        else {
-            let headStart = 0
-            let headEnd = headStart + headCount
-            let newStart = _copyContents(
-                subRange: headStart..<headEnd,
-                initializing: destStart)
-            initializeNewElements(newStart, newCount)
-            let tailStart = headEnd + oldCount
-            let tailEnd = count
-            _copyContents(subRange: tailStart..<tailEnd, initializing: newEnd)
         }
         self = dest
     }

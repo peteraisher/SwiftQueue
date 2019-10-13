@@ -35,7 +35,6 @@ extension SwiftQueue {
             bufferIterator = buffer.makeIterator()
         }
     }
-//    typealias Iterator = _Backing.Iterator
     
     @inlinable
     public func makeIterator() -> Iterator {
@@ -57,10 +56,12 @@ extension SwiftQueue {
 
 extension SwiftQueue {
     
+    /// Check if an index is valid
     @inlinable
     internal func _checkIndex(_ index: Int) {
         assert(index >= 0 && index < count)
     }
+    
     
     @inlinable
     public subscript(index: Int) -> Element {
@@ -79,6 +80,9 @@ extension SwiftQueue {
 // MARK: Selecting and excluding elements
 extension SwiftQueue {
     
+    /// Removes and returns the first element of the collection.
+    ///
+    /// - Returns: The first element of the collection if the collection is not empty; otherwise, nil.
     @inlinable
     @discardableResult
     mutating public func popFirst() -> Element? {
@@ -86,13 +90,19 @@ extension SwiftQueue {
         return removeFirst()
     }
     
+    /// Ensure the buffer backing this queue is unique.
+    ///
+    /// If the buffer was not unique, it is copied to a new buffer with the same capacity
+    /// with its elements in logical order, i.e. the first element at buffer index 0.
     @inlinable
     mutating func _makeUniqueAndLogicallyReorderIfNotUnique() {
-        if _slowPath(!_buffer.isUniquelyReferenced()) {
-            _buffer = _buffer._createLogicallyOrderedCopy()
-        }
+        let theCount = self.count
+        _buffer._outlinedMakeUniqueBuffer(bufferCount: theCount)
     }
     
+    /// Remove and return the first element of the queue without checking for uniqueness.
+    ///
+    /// - Returns: The first element of the queue.
     @inlinable
     @discardableResult
     internal mutating func _removeFirstAssumingUnique() -> Element {
@@ -146,6 +156,9 @@ extension SwiftQueue {
     @inlinable
     public var count: Int { return _getCount() }
     
+    /// The first element of the queue.
+    ///
+    /// If the queue is empty, the value of this property is `nil`.
     @inlinable
     public var first: Element? {
         guard !isEmpty else { return nil }
@@ -185,12 +198,13 @@ extension SwiftQueue {
 
 extension SwiftQueue {
     
+    /// Get the number of elements in the queue.
     @inlinable
     internal func _getCount() -> Int { return _buffer.count }
     
     /// Copy the contents of the current buffer to a new unique mutable buffer.
     /// The count of the new buffer is set to `oldCount`, the capacity of the
-    /// new buffer is big enough to hold 'oldCount' + 1 elements.
+    /// new buffer is big enough to hold `oldCount` + 1 elements.
     @inline(never)
     @inlinable // @specializable
     internal mutating func _copyToNewBuffer(oldCount: Int) {
@@ -202,6 +216,12 @@ extension SwiftQueue {
             newCount: 0)
     }
     
+    /// Reserve capacity required for appending one element without checking for uniqueness.
+    ///
+    /// If the buffer has insufficient capacity, a new buffer is created and the contents are copied
+    ///
+    /// - Complexity: O(*1*) if the buffer has sufficient capacity; otherwise O(*n*), where *n*
+    ///     is the number of elements in the queue.
     @inlinable
     internal mutating func _reserveCapacityAssumingUniqueBuffer(oldCount: Int) {
         if _slowPath(oldCount + 1 > _buffer.capacity) {
@@ -209,6 +229,11 @@ extension SwiftQueue {
         }
     }
     
+    /// Ensure the buffer is unique, copying to a buffer with sufficient capacity for
+    /// appending one element if the buffer was not unique.
+    ///
+    /// - Complexity: O(*1*) if the buffer was unique;  otherwise O(*n*), where *n*
+    ///     is the number of elements in the queue.
     @inlinable
     internal mutating func _makeUniqueAndReserveCapacityIfNotUnique() {
         if _slowPath(!_buffer.isUniquelyReferenced()) {
@@ -216,6 +241,9 @@ extension SwiftQueue {
         }
     }
     
+    /// Append an element to the queue without checking for uniqueness or sufficient capacity.
+    /// - Parameter oldTailIndex: The previous `tailIndex`, i.e. the buffer position at which to insert the element.
+    /// - Parameter newElement: The element to be inserted.
     @inlinable
     internal mutating func _appendElementAssumeUniqueAndCapacity(
         _ oldTailIndex: Int,
@@ -243,7 +271,6 @@ extension SwiftQueue {
     mutating public func insert<C>(contentsOf newElements: __owned C, at i: Index) where C : Collection, Element == C.Element {
         guard newElements.count > 0 else { return }
         _buffer._reorderingOutOfPlaceReplace(circularRange: i ..< i, with: newElements, count: newElements.count)
-//        storage.insert(contentsOf: newElements.map({Optional($0)}), at: i + firstStorageIndex)
     }
     
     @inlinable
@@ -264,8 +291,6 @@ extension SwiftQueue {
         } else {
             _buffer = _Backing()
         }
-//        storage.removeAll(keepingCapacity: keepCapacity)
-//        firstStorageIndex = 0
     }
 }
 
@@ -284,12 +309,13 @@ extension SwiftQueue: ExpressibleByArrayLiteral {
 // MARK: - Extra methods
 
 extension SwiftQueue {
+    /// The last element of the queue.
+    ///
+    /// If the queue is empty, the value of this property is `nil`.
     @inlinable
     public var last: Element? {
         let theCount = count
         guard theCount > 0 else { return nil }
         return self[theCount - 1]
-//        guard storage.count > firstStorageIndex else { return nil }
-//        return storage.last!
     }
 }
