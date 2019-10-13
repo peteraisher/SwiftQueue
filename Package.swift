@@ -24,5 +24,8 @@ let package = Package(
         .testTarget(
             name: "SwiftQueueTests",
             dependencies: ["SwiftQueue"]),
+        .testTarget(
+            name: "SwiftQueuePerformanceTests",
+            dependencies: ["SwiftQueue"]),
     ]
 )
