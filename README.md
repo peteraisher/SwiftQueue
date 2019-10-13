@@ -9,25 +9,69 @@ on a possibly-empty queue.
 
 Subscript access allows access to the elements of the queue in the order that they were added.
 
-## Usage example
+## Features
 
-    var emptyQueue = SwiftQueue<Int>()
+- Conforms to the same protocols as `Array` including `Collection` and `RangeReplaceableCollection`.
+- Uses a highly-performant circular buffer backing.
+- `append(_:)` and `popFirst()` are both O(*1*) operations.
+- Significantly better cache-locality than linked-list implementations.
+- Thoroughly documented source code.
+
+## Documentation
+
+The source code contains extensive documentation of both public and internal functions.
+`SwiftQueue` does not add extra methods for `push(_:)`, `pop()` and `peek()` instead using
+the existing methods and properties defined in Swift's various protocols:
+- `append(_:)` to add an element to the end of the queue
+- `popFirst() -> Element?` to remove the first element in the queue or return `nil` if empty
+- `first: Element?` to access the first element in the queue without removing it.
+
+### Initialization
+
+`SwiftQueue` can be initialized just like an `Array` instance.
+
+A queue with `Int` elements can be created as follows:
+
+    var queue = SwiftQueue<Int>()
+    ...
+    var queue = SwiftQueue([1, 3, 5, 8, 9])
+    ...
+    var queue = SwiftQueue( 2 ..< 14 )
+    ...
+    var queue: SwiftQueue = [1, 2, 4, 3, 6]
+
+### Adding, removing, and accessing elements
+
+Elements can be added, removed and accessed using standard methods and properties:
+
+    var queue: SwiftQueue = ["I", "love", "to", "queue"]
     
-    emptyQueue.isEmpty      // returns true
-    emptyQueue.first        // returns nil
+    queue.append("!")
+    print(queue.removeFirst())  // prints "I"
     
-    var oneToTen = SwiftQueue( 1 ... 10 )
+    print(queue.first!)         // prints "love"
     
-    oneToTen.count          // returns 10
-    oneToTen.removeFirst()  // returns 1
-    oneToTen.first!         // returns 2
-    oneToTen.last!          // returns 10
-    oneToTen.count          // returns 9
+    for element in queue {
+        print(element)          // prints "to", "queue", "!"
+    }
     
-    oneToTen.append(15)
+    print(queue[1])             // prints "queue"
     
-    oneToTen.count          // returns 10
-    oneToTen.last!          // returns 15
+    while let element = queue.popFirst() {
+        print(element)          // prints "to", "queue", "!"
+    }
+    
+    print(queue.isEmpty)        // prints "true"
+
+### Other operations
+
+Other methods and properties can be used like with `Array`:
+
+    let queue: SwiftQueue = [1.0, 3.2, 3.5, 8.0]
+    
+    queue.count             // returns 4
+    
+    queue.last              // returns Optional(8.0)
     
 ## Performance
 
