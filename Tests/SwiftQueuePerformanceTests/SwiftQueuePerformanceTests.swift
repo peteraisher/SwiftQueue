@@ -4,6 +4,7 @@ import XCTest
 final class SwiftQueuePerformanceTests: XCTestCase {
     
     let numItems: Int = 10_000
+    let numRepeats: Int = 100
     
     final class Dummy: Equatable {
         let number: Int
@@ -17,103 +18,92 @@ final class SwiftQueuePerformanceTests: XCTestCase {
         
         let items = Array(0 ..< numItems)
         
-        measureMetrics(XCTestCase.defaultPerformanceMetrics, automaticallyStartMeasuring: false) {
-            startMeasuring()
-            let queue = SwiftQueue(items)
-            XCTAssertEqual(queue.count, numItems)
-            stopMeasuring()
-            let array = Array(queue)
-            XCTAssertEqual(array, items)
+        measure {
+            for _ in 0 ..< 100 * numRepeats {
+                let queue = SwiftQueue(items)
+                _fixLifetime(queue)
+            }
         }
         
     }
     
     func testCreateReferenceType() {
         
-        let items = Array((0 ..< numItems).map({Dummy($0)}))
+        let items = Array((0 ..< 10 * numItems).map({Dummy($0)}))
         
-        measureMetrics(XCTestCase.defaultPerformanceMetrics, automaticallyStartMeasuring: false) {
-            startMeasuring()
-            let queue = SwiftQueue(items)
-            XCTAssertEqual(queue.count, numItems)
-            stopMeasuring()
-            let array = Array(queue)
-            XCTAssertEqual(array, items)
+        measure {
+            for _ in 0 ..< numRepeats {
+                let queue = SwiftQueue(items)
+                _fixLifetime(queue)
+            }
         }
     }
     
     func testDeepCopyValueType() {
         let original = SwiftQueue(0 ..< numItems)
         
-        measureMetrics(XCTestCase.defaultPerformanceMetrics, automaticallyStartMeasuring: false) {
-            startMeasuring()
-
-            var copy = original
-            copy.append(numItems)
-            
-            XCTAssertEqual(copy.count, numItems + 1)
-            stopMeasuring()
-            
-            XCTAssertEqual(Array(copy), original + [numItems])
+        measure {
+            for _ in 0 ..< 100 * numRepeats {
+                var copy = original
+                copy.append(numItems)
+                _fixLifetime(copy)
+            }
         }
     }
     
     func testDeepCopyReferenceType() {
         let original = SwiftQueue((0 ..< numItems).map({Dummy($0)}))
         
-        measureMetrics(XCTestCase.defaultPerformanceMetrics, automaticallyStartMeasuring: false) {
-            startMeasuring()
-            var copy = original
-            
-            copy.append(Dummy(numItems))
-            
-            XCTAssertEqual(copy.count, numItems + 1)
-            stopMeasuring()
-            
-            XCTAssertEqual(Array(copy), original + [Dummy(numItems)])
-            
+        measure {
+            for _ in 0 ..< 10 * numRepeats {
+                var copy = original
+                copy.append(Dummy(numItems))
+                _fixLifetime(copy)
+            }
         }
     }
     
     func testRemoveFirstValueType() {
         
-        measureMetrics(SwiftQueuePerformanceTests.defaultPerformanceMetrics, automaticallyStartMeasuring: false) {
-            var original = SwiftQueue(0 ..< numItems)
-            startMeasuring()
-            for _ in 0 ..< numItems - 1 {
-                _ = original.removeFirst()
+        let elements = Array(0 ..< numItems)
+        
+        measure {
+            for _ in 0 ..< numRepeats {
+                var original = SwiftQueue(elements)
+                for _ in 0 ..< numItems {
+                    _ = original.removeFirst()
+                }
+                _fixLifetime(original)
             }
-            let actual = original.removeFirst()
-            stopMeasuring()
-            XCTAssertEqual(actual, numItems - 1)
         }
     }
     
     func testAlternatingAppendAndRemove() {
-        var queue = SwiftQueue<Int>()
         measure {
-            for i in 0 ..< numItems {
-                if i % 3 == 2 { _ = queue.removeFirst() }
-                else { queue.append(i) }
-            }
-            for i in 0 ..< numItems {
-                if i % 3 == 0 { queue.append(i) }
-                else { _ = queue.removeFirst() }
+            for _ in 0 ..< numRepeats {
+                var queue = SwiftQueue<Int>()
+                for i in 0 ..< numItems {
+                    if i % 3 == 2 { _ = queue.removeFirst() }
+                    else { queue.append(i) }
+                }
+                for i in 0 ..< numItems {
+                    if i % 3 == 0 { queue.append(i) }
+                    else { _ = queue.removeFirst() }
+                }
             }
         }
     }
     
     
     func testRandomModifications() {
-        var random = SystemRandomNumberGenerator()
         func randomIndex(count: Int) -> Int {
-            return Int(random.next(upperBound: UInt(count)))
+            return Int(drand48() * Double(count))
         }
         func randomValue() -> Int {
-            return Int(random.next(upperBound: UInt(Int.max)))
+            return Int(drand48() * Double(Int.max))
         }
         func randomAction(queue: inout SwiftQueue<Int>) {
-            switch random.next(upperBound: UInt(60)) {
+            switch randomIndex(count: 60) {
             case 0 ..< 10:
                 queue.append(randomValue())
             case 10 ..< 30:
@@ -149,20 +139,23 @@ final class SwiftQueuePerformanceTests: XCTestCase {
             }
         }
         measure {
-            var queue = SwiftQueue( 0 ..< 10 )
-            for _ in 0 ..< 1000 {
-                switch random.next(upperBound: UInt(100)) {
-                case 0 ..< 5:
-                    let copy = queue
-                    randomAction(queue: &queue)
-                    _fixLifetime(copy)
-                case 5 ..< 10:
-                    var copy = queue
-                    randomAction(queue: &copy)
-                default:
-                    randomAction(queue: &queue)
+            srand48(102382034)
+            for _ in 0 ..< 10 * numRepeats {
+                var queue = SwiftQueue( 0 ..< 10 )
+                for _ in 0 ..< 100 {
+                    switch randomIndex(count: 100) {
+                    case 0 ..< 5:
+                        let copy = queue
+                        randomAction(queue: &queue)
+                        _fixLifetime(copy)
+                    case 5 ..< 10:
+                        var copy = queue
+                        randomAction(queue: &copy)
+                    default:
+                        randomAction(queue: &queue)
+                    }
+                    
                 }
-                
             }
         }
         

@@ -1,5 +1,15 @@
 import Foundation
 
+
+
+/// A first-in-first-out queue.
+///
+/// The `SwiftQueue` type stores its elements in a circular buffer in one or two contiguous
+/// regions of memory. Add elements to the queue by calling `append(_:)` and remove elements
+/// in the order they were added by calling `removeFirst()` on a non-empty queue or `popFirst()`
+/// on a possibly-empty queue.
+///
+/// Subscript access allows access to the elements of the queue in the order that they were added.
 public struct SwiftQueue<Element>: Sequence, Collection, RangeReplaceableCollection {
     
     @usableFromInline
