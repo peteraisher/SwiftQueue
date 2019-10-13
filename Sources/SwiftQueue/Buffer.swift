@@ -631,9 +631,7 @@ extension _Buffer {
         let sourceStart = sourceBase + headIndex
         
         if let backing = requestUniqueMutableBackingBuffer(minimumCapacity: sourceCount) {
-            // we can move instead of copy
-            
-            
+        
             if tailIndexIsWrapped {
                 let theCapacity = capacity
                 let capacityPointer = sourceBase + theCapacity

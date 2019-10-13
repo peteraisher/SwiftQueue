@@ -29,4 +29,10 @@ Subscript access allows access to the elements of the queue in the order that th
     oneToTen.count          // returns 10
     oneToTen.last!          // returns 15
     
+## Performance
 
+For operations such as `append(_:)`, performance of `SwiftQueue` is similar to `Array`.
+The operations `removeFirst()` and `removeFirst(k)` have complexity O(*1*) and O(*k*)
+respectively, instead of O(*n*), where *n* is the length of the collection. Additionally, when the
+number of calls to `append(_:)` and `removeFirst()` are balanced and the length of the
+queue remains stable, memory locality is maintained, thereby improving cache performance.
