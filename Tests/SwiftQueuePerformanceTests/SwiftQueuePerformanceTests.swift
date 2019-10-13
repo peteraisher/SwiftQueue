@@ -105,7 +105,6 @@ final class SwiftQueuePerformanceTests: XCTestCase {
     
     
     func testRandomModifications() {
-        var queue = SwiftQueue( 0 ..< 10 )
         var random = SystemRandomNumberGenerator()
         func randomIndex(count: Int) -> Int {
             return Int(random.next(upperBound: UInt(count)))
@@ -149,20 +148,24 @@ final class SwiftQueuePerformanceTests: XCTestCase {
                 return
             }
         }
-        for _ in 0 ..< 10000 {
-            switch random.next(upperBound: UInt(100)) {
-            case 0 ..< 5:
-                let copy = queue
-                randomAction(queue: &queue)
-                _fixLifetime(copy)
-            case 5 ..< 10:
-                var copy = queue
-                randomAction(queue: &copy)
-            default:
-                randomAction(queue: &queue)
+        measure {
+            var queue = SwiftQueue( 0 ..< 10 )
+            for _ in 0 ..< 1000 {
+                switch random.next(upperBound: UInt(100)) {
+                case 0 ..< 5:
+                    let copy = queue
+                    randomAction(queue: &queue)
+                    _fixLifetime(copy)
+                case 5 ..< 10:
+                    var copy = queue
+                    randomAction(queue: &copy)
+                default:
+                    randomAction(queue: &queue)
+                }
+                
             }
-            
         }
+        
     }
 
     static var allTests = [

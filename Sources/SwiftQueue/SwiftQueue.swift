@@ -6,6 +6,8 @@ public struct SwiftQueue<Element>: Sequence, Collection, RangeReplaceableCollect
     internal typealias _Backing = _Buffer<Element>
     
     /// The buffer backing this queue
+    ///
+    /// May be shared with other queues after copy but before any modification has occurred.
     @usableFromInline
     internal var _buffer: _Backing
 }
@@ -17,6 +19,9 @@ public struct SwiftQueue<Element>: Sequence, Collection, RangeReplaceableCollect
 extension SwiftQueue {
     
     
+    /// Provides iterated sequential access to the elements of the queue
+    ///
+    /// Wraps an iterator to the underlying buffer.
     public struct Iterator: IteratorProtocol {
         public mutating func next() -> Element? {
             return bufferIterator.next()
@@ -51,13 +56,6 @@ extension SwiftQueue {
 // MARK: Accessing Elements
 
 extension SwiftQueue {
-    
-    @inlinable
-    internal mutating func _makeUnique() {
-      if _slowPath(!_buffer.isUniquelyReferenced()) {
-        _buffer = _Backing(copying: _buffer)
-      }
-    }
     
     @inlinable
     internal func _checkIndex(_ index: Int) {
