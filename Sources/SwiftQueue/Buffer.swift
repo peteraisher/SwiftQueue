@@ -1,35 +1,51 @@
+/// A base class to represent the storage for a buffer.
 @usableFromInline
 internal class _StorageBase {
-    @usableFromInline
-    final var capacityIndicesAndFlag = _CircularArrayBody()
     
+    /// The index and capacity information for the storage.
+    @usableFromInline
+    final var capacityIndicesAndFlag = _CircularBufferBody()
+    
+    /// The raw pointer to the elements of the storage.
     @usableFromInline
     var _rawPointer: UnsafeMutableRawPointer
     
+    /// Initialize a new storage instance.
     @inlinable
     init() {
         _rawPointer = UnsafeMutableRawPointer(&capacityIndicesAndFlag)
     }
 }
 
+/// Grow the capacity of a buffer
+/// - Parameter capacity: The current capacity.
+/// - Returns: The new capacity.
 @inlinable
-internal func _growArrayCapacity(_ capacity: Int) -> Int {
+internal func _growBufferCapacity(_ capacity: Int) -> Int {
     return capacity * 2
 }
 
+/// A class to represent the storage of an empty buffer.
 @usableFromInline
 internal class _EmptyStorage: _StorageBase {
 }
 
+/// A struct to hold index and capacity information about a circular buffer
 @usableFromInline
-struct _CircularArrayBody {
+struct _CircularBufferBody {
+    /// The capacity of the buffer.
     @usableFromInline
     var capacity: Int
+    
+    /// The index of the first element of the circular buffer.
     @usableFromInline
     var headIndex: Int
+    
+    /// Combines the `tailIndex` with the `tailIndexIsWrapped` flag.
     @usableFromInline
     var tailIndexAndFlag: UInt
     
+    /// A flag indicating if the `tailIndex` has wrapped beyond the capacity of the circular buffer.
     @inlinable
     var tailIndexIsWrapped: Bool {
         get {
@@ -40,6 +56,9 @@ struct _CircularArrayBody {
         }
     }
     
+    /// The index beyond the last element of the circular buffer.
+    ///
+    /// - Note: if `tailIndex` is set to capacity, it wraps back to zero and sets the `tailIndexIsWrapped` flag to `true`
     @inlinable
     var tailIndex: Int {
         get {
@@ -55,13 +74,16 @@ struct _CircularArrayBody {
         }
     }
     
+    /// Initialize with given count and capacity.
+    /// - Parameter count: The number of elements currently in the buffer.
+    /// - Parameter capacity: The number of elements the buffer can hold.
     @usableFromInline
     init(count: Int, capacity: Int) {
         self.headIndex = 0
         self.tailIndexAndFlag = (count == capacity) ? 1 : UInt(truncatingIfNeeded: count &<< 1)
         self.capacity = capacity
     }
-    
+    /// Initialize with zero count and capacity.
     init() {
         self.headIndex = 0
         self.tailIndexAndFlag = 0
@@ -69,19 +91,30 @@ struct _CircularArrayBody {
     }
 }
 
-var _emptyArrayStorage: _EmptyStorage = _EmptyStorage()
 
+/// A single instance of empty storage shared between all empy buffers.
+internal var _emptyBufferStorage: _EmptyStorage = _EmptyStorage()
+
+/// The class which stores the elements of a buffer.
 @usableFromInline
 class _Storage<Element>: _StorageBase {
     
+    /// Create a new instance with the given capacity and count.
+    ///
+    /// - Parameter capacity: The capacity of the created storage.
+    /// - Parameter count: The number of elements contained by the storage.
+    ///
+    /// - Note: If `count` is greater than zero, the elements up to `count` must be manually
+    ///     initialized before the storage instance is valid.
     @inlinable
     init(capacity: Int, count: Int) {
         super.init()
-        self.capacityIndicesAndFlag = _CircularArrayBody(count: count, capacity: capacity)
+        self.capacityIndicesAndFlag = _CircularBufferBody(count: count, capacity: capacity)
         let _elementPointer = UnsafeMutablePointer<Element>.allocate(capacity: capacity)
         self._rawPointer = UnsafeMutableRawPointer(_elementPointer)
     }
     
+    /// The pointer to the first element of the storage.
     @inlinable
     internal final var _elementPointer: UnsafeMutablePointer<Element> {
         return _rawPointer.assumingMemoryBound(to: Element.self)
@@ -105,12 +138,18 @@ class _Storage<Element>: _StorageBase {
     }
 }
 
+/// A circular buffer of elements used as the backing for a queue.
 @usableFromInline
 struct _Buffer<Element> {
     
+    /// The buffer's storage.
     @usableFromInline
     internal var _storage: _StorageBase
     
+    /// The index beyond the last element of the circular buffer.
+    ///
+    /// Setting `tailIndex` to `capacity` causes the index to wrap round to
+    /// zero and sets the flag `tailIndexIsWrapped` to `true`.
     @inlinable
     internal var tailIndex: Int {
         get {
@@ -128,6 +167,10 @@ struct _Buffer<Element> {
         }
     }
     
+    /// The index of the first element of the circular buffer.
+    ///
+    /// Setting `headIndex` to `capacity` causes the index to wrap around to
+    /// zero and sets the flag `tailIndexIsWrapped` to `false`.
     @inlinable
     internal var headIndex: Int {
         get {
@@ -145,6 +188,13 @@ struct _Buffer<Element> {
         }
     }
     
+    /// A flag indicating if the `tailIndex` has wrapped beyond the capacity of the circular buffer.
+    ///
+    /// If the value is `true`, the elements of the buffer are stored in two regions,
+    /// with indices in the ranges ` headIndex ..< capacity` and `0 ..< tailIndex`.
+    ///
+    /// Otherwise, the elements of the buffer are stored in one region with indices
+    /// in the range `headIndex ..< tailIndex`.
     @inlinable
     internal var tailIndexIsWrapped: Bool {
         get {
@@ -155,47 +205,69 @@ struct _Buffer<Element> {
         }
     }
     
+    /// The number of elements stored in the buffer.
     @usableFromInline
     internal var count: Int {
         return tailIndex - headIndex + (tailIndexIsWrapped ? capacity : 0)
     }
     
+    /// A boolean value indicating whether the buffer is empty.
     @usableFromInline
     internal var isEmpty: Bool {
         count == 0
     }
     
+    /// The capacity of the buffer's storage, i.e. the maximum number of elements the buffer
+    /// can hold without requiring new storage.
     @usableFromInline
     internal var capacity: Int { return _storage.capacityIndicesAndFlag.capacity }
     
+    /// A pointer to the first element of the buffer's storage.
+    /// - Note: This is **not** generally the same as the logical first element of the buffer.
     @usableFromInline
     internal var firstElementAddress: UnsafeMutablePointer<Element> {
         return _storage._rawPointer.assumingMemoryBound(to: Element.self)
     }
     
+    /// Create a linear index to the underlying storage from a circular index in the range `0 ..< count`
+    /// without checking its validity.
+    /// - Parameter circularIndex: The circular index in the range `0 ..< count`.
+    /// - Returns: The corresponding linear index in the underlying storage.
     @inlinable
     func _uncheckedLinearIndex(from circularIndex: Int) -> Int {
         return (headIndex + circularIndex) % capacity
     }
     
+    /// Get the element at the given circular index without
+    /// checking the validity of the index.
+    /// - Parameter index: The circular index in the range `0 ..< count`.
+    /// - Returns: The corresponding element.
     @inlinable
-    func getCircularElementAtUncheckedIndex(_ index: Int) -> Element {
+    func getElementAtUncheckedCircularIndex(_ index: Int) -> Element {
         let linearIndex = _uncheckedLinearIndex(from: index)
         return self[linearIndex]
     }
     
+    /// Get a pointer to the element at the given circular index wihout checking the validity of the index.
+    /// - Parameter index: The circular index in the range `0 ..< count`.
+    /// - Returns: A pointer to the corresponding element.
     @inlinable
-    func getCircularElementPointerAtUncheckedIndex(_ index: Int) -> UnsafeMutablePointer<Element> {
+    func getElementPointerAtUncheckedCircularIndex(_ index: Int) -> UnsafeMutablePointer<Element> {
         let linearIndex = _uncheckedLinearIndex(from: index)
         return firstElementAddress + linearIndex
     }
     
+    /// Get the element at the given linear index.
+    /// - Parameter i: The linear index of the element to return.
+    /// - Returns: The element at the linear index specified.
     @inlinable
     @inline(__always)
     func getElement(i: Int) -> Element {
         return firstElementAddress[i]
     }
     
+    /// Access the element at the given linear index.
+    /// - Parameter i: The linear index of the element to access.
     @inlinable
     subscript(i: Int) -> Element {
         @inline(__always)
@@ -211,21 +283,28 @@ struct _Buffer<Element> {
         }
     }
     
+    /// Is the buffer uniquely referenced.
+    /// - Returns: `true` if the buffer's storage is uniquely referenced; otherwise `false`.
     @inlinable
     internal mutating func isUniquelyReferenced() -> Bool {
         return isKnownUniquelyReferenced(&_storage)
     }
     
+    /// The object that keeps reference types alive.
     @inlinable
     internal var owner: AnyObject {
       return _storage
     }
     
+    /// Create a buffer with empty storage.
     @inlinable
     internal init() {
         _storage = _EmptyStorage()
     }
     
+    /// Request a unique mutable buffer with the given capacity.
+    /// - Parameter minimumCapacity: The minimum capacity for the buffer.
+    /// - Returns: This buffer if it has sufficient capacity; othewise `nil`.
     @inlinable
     internal mutating func requestUniqueMutableBackingBuffer(
         minimumCapacity: Int
@@ -238,7 +317,7 @@ struct _Buffer<Element> {
     
     /// Make a buffer with uninitialized elements.  After using this
     /// method, you must either initialize the `count` elements at the
-    /// result's `.firstElementAddress` or set the result's `.count`
+    /// result's `.firstElementAddress` or set the result's `.tailIndex`
     /// to zero.
     @inlinable
     internal init(
@@ -255,6 +334,10 @@ struct _Buffer<Element> {
     }
 }
 
+
+/// Copy a sequence into a new buffer.
+/// - Parameter source: The sequence to copy.
+/// - Returns: A buffer containing the elements of `source`.
 @inlinable
 internal func _copySequenceToContiguousBuffer<S: Sequence>(_ source: S) -> _Buffer<S.Element> {
     let initialCapacity = source.underestimatedCount
@@ -316,7 +399,7 @@ internal struct _UnsafePartiallyInitializedBuffer<Element> {
     internal mutating func add(_ element: Element) {
         if remainingCapacity == 0 {
             // Reallocate.
-            let newCapacity = max(_growArrayCapacity(result.capacity), 1)
+            let newCapacity = max(_growBufferCapacity(result.capacity), 1)
             var newResult = _Buffer<Element>(
                 _uninitializedCount: newCapacity, minimumCapacity: 0)
             p = newResult.firstElementAddress + result.capacity
@@ -383,6 +466,7 @@ extension _Buffer: Sequence {
         return Iterator(base: firstElementAddress, capacity: capacity, count: count, headIndex: headIndex)
     }
     
+    /// A non-destructive iterator over this buffer.
     @usableFromInline
     struct Iterator: IteratorProtocol {
         
@@ -410,6 +494,12 @@ extension _Buffer: Sequence {
             return pointer.pointee
         }
         
+        
+        /// Create an iterator for a buffer.
+        /// - Parameter base: The buffer's `firstElementAddress`.
+        /// - Parameter capacity: The buffer's `capacity`.
+        /// - Parameter count: The buffer's `count`.
+        /// - Parameter headIndex: The buffer's `headIndex`.
         @inlinable
         init(base: UnsafeMutablePointer<Element>, capacity: Int, count: Int, headIndex: Int) {
             self.wrapPointer = base + capacity
@@ -422,21 +512,30 @@ extension _Buffer: Sequence {
 
 extension _Buffer {
     
+    /// Force the creation of a new unique buffer with a given count and minimum capacity.
+    ///
+    /// If `newCount` is greater than `requiredCapacity`, the capacity of the new buffer
+    /// is grown using `_growBufferCapacity`.
+    /// - Parameter newCount: The count of the new buffer.
+    /// - Parameter requiredCapacity: The required capacity.
+    /// - Returns: An uninitialized unique buffer with `newCount` elements and sufficient capacity.
     @inline(never)
-    @inlinable // @specializable
+    @inlinable
     internal func _forceCreateUniqueMutableBuffer(
         newCount: Int, requiredCapacity: Int
     ) -> _Buffer<Element> {
         let minimumCapacity = Swift.max(
             requiredCapacity,
             newCount > capacity
-                ? _growArrayCapacity(capacity) : capacity
+                ? _growBufferCapacity(capacity) : capacity
         )
 
         return _Buffer(
           _uninitializedCount: newCount, minimumCapacity: minimumCapacity)
     }
     
+    /// Make the buffer unique by copying to a new buffer if necessary.
+    /// - Parameter bufferCount: The number of elements in the buffer.
     @inline(never)
     @usableFromInline
     internal mutating func _outlinedMakeUniqueBuffer(bufferCount: Int) {
@@ -451,6 +550,11 @@ extension _Buffer {
         _reorderingOutOfPlaceUpdate(dest: &newBuffer, headCount: bufferCount, newCount: 0)
     }
     
+    /// Replace elements of the buffer and reorder the remaining elements into logical order.
+    /// - Parameter bounds: The range of elements to replace, using circular indices.
+    /// - Parameter newValues: The values to replace by.
+    /// - Parameter insertCount: The number of values to be inserted.
+    /// - Note: The number of elements in `newValues` must be equal to `insertCount`.
     @inlinable
     internal mutating func _reorderingOutOfPlaceReplace<C: Collection>(
         circularRange bounds: Range<Int>,
@@ -479,6 +583,26 @@ extension _Buffer {
         )
     }
     
+    /// Out of place update with reordering.
+    ///
+    /// Initialize the elements of `dest` by copying the first `headCount`
+    /// items from `source`, calling `initializeNewElements` on the next
+    /// uninitialized element, and finally by copying the last N items
+    /// from `source` into the N remaining uninitialized elements of `dest`.
+    ///
+    /// This function also logically orders the elements in `dest` during the copy
+    /// and then sets `self` to `dest`.
+    ///
+    /// As an optimization, may move elements out of `source` rather than
+    /// copying when it `isUniquelyReferenced`.
+    ///
+    /// - Parameter dest: The buffer in which to perform the update.
+    /// - Parameter headCount: The number of elements to initially copy.
+    /// - Parameter newCount: The number of new elements to be initialized.
+    /// - Parameter initializeNewElements: A closure to initialize the new elements.
+    ///
+    /// - Note: If the optional parameter `initializeNewElements` is not provided,
+    ///     `newCount` must be zero.
     @inline(never)
     @inlinable
     internal mutating func _reorderingOutOfPlaceUpdate(

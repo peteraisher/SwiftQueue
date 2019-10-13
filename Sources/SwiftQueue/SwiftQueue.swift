@@ -67,12 +67,12 @@ extension SwiftQueue {
     public subscript(index: Int) -> Element {
       get {
         _checkIndex(index)
-        return _buffer.getCircularElementAtUncheckedIndex(index)
+        return _buffer.getElementAtUncheckedCircularIndex(index)
       }
       _modify {
         _makeUniqueAndLogicallyReorderIfNotUnique()
         _checkIndex(index)
-        let address = _buffer.getCircularElementPointerAtUncheckedIndex(index)
+        let address = _buffer.getElementPointerAtUncheckedCircularIndex(index)
         yield &address.pointee
       }
     }
