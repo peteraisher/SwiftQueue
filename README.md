@@ -32,48 +32,53 @@ the existing methods and properties defined in Swift's various protocols:
 
 A queue with `Int` elements can be created as follows:
 
-    var queue = SwiftQueue<Int>()
-    ...
-    var queue = SwiftQueue([1, 3, 5, 8, 9])
-    ...
-    var queue = SwiftQueue( 2 ..< 14 )
-    ...
-    var queue: SwiftQueue = [1, 2, 4, 3, 6]
+```swift
+var queue = SwiftQueue<Int>()
+...
+var queue = SwiftQueue([1, 3, 5, 8, 9])
+...
+var queue = SwiftQueue( 2 ..< 14 )
+...
+var queue: SwiftQueue = [1, 2, 4, 3, 6]
+```
 
 ### Adding, removing, and accessing elements
 
 Elements can be added, removed and accessed using standard methods and properties:
 
-    var queue: SwiftQueue = ["I", "love", "to", "queue"]
-    
-    queue.append("!")           // queue is now ["I", "love", "to", "queue", "!"]
-    print(queue.removeFirst())  // prints "I"
-                                // queue is now ["love", "to", "queue", "!"]
-    
-    print(queue.first!)         // prints "love"
-    
-    for element in queue {
-        print(element)          // prints "to", "queue", "!"
-    }
-    
-    print(queue[1])             // prints "queue"
-    
-    while let element = queue.popFirst() {
-        print(element)          // prints "to", "queue", "!"
-    }
-    
-    print(queue.isEmpty)        // prints "true"
+```swift
+var queue: SwiftQueue = ["I", "love", "to", "queue"]
+
+queue.append("!")           // queue is now ["I", "love", "to", "queue", "!"]
+print(queue.removeFirst())  // prints "I"
+                            // queue is now ["love", "to", "queue", "!"]
+
+print(queue.first!)         // prints "love"
+
+for element in queue {
+    print(element)          // prints "to", "queue", "!"
+}
+
+print(queue[1])             // prints "queue"
+
+while let element = queue.popFirst() {
+    print(element)          // prints "to", "queue", "!"
+}
+
+print(queue.isEmpty)        // prints "true"
+```
 
 ### Other operations
 
 Other methods and properties can be used like with `Array`:
 
-    let queue: SwiftQueue = [1.0, 3.2, 3.5, 8.0]
-    
-    queue.count             // returns 4
-    
-    queue.last              // returns Optional(8.0)
-    
+```swift
+let queue: SwiftQueue = [1.0, 3.2, 3.5, 8.0]
+
+queue.count             // returns 4
+
+queue.last              // returns Optional(8.0)
+```
 ## Performance
 
 For operations such as `append(_:)`, performance of `SwiftQueue` is similar to `Array`.
